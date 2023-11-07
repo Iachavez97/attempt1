@@ -1,0 +1,283 @@
+---
+title: "Beer"
+output: html_document
+date: "2023-10-04"
+
+---
+```{r}
+#Hello CEO and CFO of Budweiser the purpose of this Exploritory Data Analysis was take the Beers and Breweries data sets and answer some statistical questions. Within this Code we have provided the graphs and results to answer the following question. How many breweries are in each stat?  We addressed the missing values form the data sets. We determined the median ABV and IBU for each state along with the states that had the highest ABV and IBU. The distribution of ABV was determined and a statistical summary was performed. We determined a relationship between the ABV and IBU of the beers listed in the data sets through a scatter plot. Through a KNN model for determining nearest neighbors, we were able to determine the accuracy of whether a beer is an IPA or an Ales from a list of Ales based on the ABV and IBU. And last we were able to determine whether the was a statistical difference in the amount of ounces in a beer by looking at the ABV content of the beers. We hope that all of you question will be answered, but if not feel free to reach out to us for further explanation, thank you for your time. 
+
+
+library(class)
+library(caret)
+library(e1071)
+library(tidyverse)
+library(e1071)
+#The data sets are brought into R
+df1 <-read.csv("/Users/ivanchavez/Library/CloudStorage/OneDrive-SouthernMethodistUniversity/DS- 6306 Doing DS/Beers.csv")
+beer <- (df1)
+
+df2 <- read.csv("/Users/ivanchavez/Library/CloudStorage/OneDrive-SouthernMethodistUniversity/DS- 6306 Doing DS/Breweries.csv")
+breweries <- (df2)
+
+#This was used to look at two data sets and compare them, seeing what their similarities are. Also what the column names are.
+head(beer)
+head(breweries)
+summary(beer)
+summary(breweries)
+
+#The next three lines of code were to rename some of the columns because both data sets contained the same column name but different data within.
+colnames(beer)[1] = "beer_name"
+colnames(breweries)[2] = "brewery_name"
+colnames(breweries)[1] = "Brewery_id"
+
+#This line was used to merge the breweries data set into the beer data set. And the I look to make sure that they were merged correctly with the head and summary function
+bb <- merge(beer, breweries)
+head(bb)
+summary(bb)
+
+#This table shows how many breweries are present in each state. 
+table(breweries$State)
+breweries%>%count(State)
+breweries %>% ggplot(aes(x = State)) + geom_bar() + scale_x_discrete(guide = guide_axis(angle = 90))
+
+#This was used to determine what columns contained the NAs.  It appears that the NAs are missing at random and are not tied to any other variable. Becasue of this we removed them from the data sets. 
+sum(is.na(bb$Brewery_id))
+sum(is.na(bb$beer_name))
+sum(is.na(bb$Beer_ID))
+sum(is.na(bb$ABV))
+sum(is.na(bb$IBU))
+sum(is.na(bb$Style))
+sum(is.na(bb$Ounces))
+sum(is.na(bb$brewery_name))
+sum(is.na(bb$City))
+sum(is.na(bb$State))
+
+bb %>% group_by(State) %>% summarise_at(vars(ABV), list(name = mean))
+bb %>% group_by(State) %>% summarise_at(vars(IBU), list(name = mean))
+
+#Here the NAs from the data set were removed, and it was determine that they were random. 
+bb2<- na.omit(bb)
+
+#Here the two groups of IBU and ABV were summarized and then plotted by the median. 
+bb2 %>% group_by(State) %>% summarise_at(vars(ABV), list(name = median))
+bb2 %>% group_by(State) %>% summarise_at(vars(IBU), list(name = median))
+
+bb2 %>% group_by(State) %>% summarise_at(vars(ABV), list(name = median)) %>% ggplot(aes(x = State, y=name, colour = State )) + geom_point() + scale_x_discrete(guide = guide_axis(angle = 90))
+bb2 %>% group_by(State) %>% summarise_at(vars(IBU), list(name = median)) %>% ggplot(aes(x = State, y=name, colour = State )) + geom_point() + scale_x_discrete(guide = guide_axis(angle = 90))
+
+#These two plots are of the median values of the ABV and IBU by state
+bb2%>% ggplot(aes(x = State, y =  ABV, colours = State )) + stat_summary(fun = "median", geom = "bar")+ scale_x_discrete(guide = guide_axis(angle = 90)) + labs(title = "Median ABV by State")
+bb2%>% ggplot(aes(x = State, y =  IBU, colours = State )) + stat_summary(fun = "median", geom = "bar")+ scale_x_discrete(guide = guide_axis(angle = 90))+ labs(title = "Median IBU by State")
+
+#The maximum value of ABV and IBU were determined by this code. 
+max_value1 <- max(bb2$ABV)
+which(bb2$ABV == max_value1)
+bb2[8, ]
+max_value2 <- max(bb2$IBU)
+which(bb2$IBU == max_value2)
+bb2[1134, ]
+
+summary(bb2$ABV)
+
+
+#This Box plot of the distribution of ABV with a red line to represent the mean of 0.05991.
+ggplot(bb2, aes(y = ABV)) + geom_boxplot(fill = "grey", color = "black", alpha = 0.7) + labs(title = "ABV Summary", y = "ABV") + geom_hline(yintercept = 0.05991, linetype = "dashed", color = "red") + theme_minimal() 
+
+#This bar graph is of the distribution of ABV with a red line to represent the median
+ggplot(bb2, aes(x= ABV)) + geom_bar() + geom_vline(xintercept = 0.057, linetype = "dashed", color = "red") + labs(title = "Distribution of ABV")
+
+
+summary(bb2$ABV)
+
+summary(bb2$Style)
+sum(grepl(" Ale", bb2$Style, ignore.case = TRUE))
+
+
+#KNN Model.
+#The data set was filtered into just the Ale and IPA beers. A new column was created that if the Style column contained IPA then it would out a 1 in the new IsIPA column. This allowed the confusion matrix to compare the IPAs to the Ales. 
+set.seed(1)
+target <- c(" Ale", "IPA") %>% paste(collapse = "|")
+bb3 <- bb2 %>% filter(str_detect(Style, target))
+bb3$IsIPA <- as.numeric(grepl(" IPA", bb3$Style, ignore.case = TRUE))
+splitPerc = .7
+
+trainIndices = sample(1:dim(bb3)[1],round(splitPerc * dim(bb3)[1]))
+train = bb3[trainIndices,]
+test = bb3[-trainIndices,]
+
+
+head(test)
+head(train)
+summary(test)
+summary(train)
+
+
+iterations = 5
+numks = 50
+splitPerc = .7
+masterAcc = matrix(nrow = iterations, ncol = numks)
+
+#This loop is used to determine which K value has the highest accuracy then its plotted. It went through this loop 50 times. 
+for(j in 1:iterations)
+{
+  set.seed(5)
+  trainIndices = sample(1:dim(bb3)[1],round(splitPerc * dim(bb3)[1]))
+  train = bb3[trainIndices,]
+  test = bb3[-trainIndices,]
+  for(i in 1:numks)
+  {
+    classifications = knn(train[, c("IBU", "ABV")], test[, c("IBU", "ABV")], train$IsIPA, k = i)
+    table(classifications, test$IsIPA)
+    CM = confusionMatrix(table(classifications, test$IsIPA))
+    masterAcc[j,i] = CM$overall[1]
+  }
+  
+}
+MeanAcc = colMeans(masterAcc)
+
+plot(seq(1,numks,1),MeanAcc, type = "l", main = "Mean Accuracy vs K value", xlab = "K value")
+
+
+#This is looking at the different k values and comparing them. The graph from above was used to determine which to look at. 9 was the highest accuracy on the graph and we wanted to know what that value was. We also look at the k = 3 and k = 5 to compare to the k = 9.  
+set.seed(5)
+target <- c(" Ale", "IPA") %>% paste(collapse = "|")
+bb3 <- bb2 %>% filter(str_detect(Style, target))
+bb3$IsIPA <- as.numeric(grepl(" IPA", bb3$Style, ignore.case = TRUE))
+splitPerc = .7
+
+trainIndices = sample(1:dim(bb3)[1],round(splitPerc * dim(bb3)[1]))
+train = bb3[trainIndices,]
+test = bb3[-trainIndices,]
+
+knn_model1 <- knn(train[, c("IBU", "ABV")], test[, c("IBU", "ABV")], train$IsIPA, k = 3)
+confusion_matrix1 <- table(knn_model1, test$IsIPA)
+confusionMatrix(knn_model1, as.factor(test$IsIPA))
+
+knn_model2 <- knn(train[, c("IBU", "ABV")], test[, c("IBU", "ABV")], train$IsIPA, k = 5)
+confusion_matrix2 <- table(knn_model2, test$IsIPA)
+confusionMatrix(knn_model2, as.factor(test$IsIPA))
+
+knn_model3 <- knn(train[, c("IBU", "ABV")], test[, c("IBU", "ABV")], train$IsIPA, k = 9)
+confusion_matrix3 <- table(knn_model3, test$IsIPA)
+confusionMatrix(knn_model3, as.factor(test$IsIPA))
+
+# max individual abv values and top 3 states with highest abv values, and the highest abv value was london balling
+max_value1 <- max(bb2$ABV)
+which(bb2$ABV == max_value1)
+bb2[8, ]
+topABV <- order(bb2$ABV, decreasing = TRUE)[1:3]
+topABV
+bb2[57,]
+bb2[182,]
+
+library(dplyr)
+
+# Calculate the average ABV by state
+median_abv_by_state <- bb2 %>%
+  group_by(State) %>%
+  summarize(median_ABV = median(ABV, na.rm = TRUE)) %>%
+  arrange(desc(median_ABV))
+
+median_abv_by_state
+# Find the top 3 states with the highest average ABV
+top_3_states <- head(median_abv_by_state, n = 3)
+
+# Print the top 3 states with the highest average ABV
+print(top_3_states)
+
+
+#finding the highest ibu values, and the highest IBU value was bitter bitch imperial
+head(bb2)
+max_value2 <- max(bb2$IBU)
+which(bb2$IBU == max_value2)
+bb2[1134, ]
+
+topIBU <- order(bb2$IBU, decreasing = TRUE)[1:3]
+topIBU
+bb2[1044,]
+bb2[788,]
+
+# Calculate the average ibu by state
+median_ibu_by_state <- bb2 %>%
+  group_by(State) %>%
+  summarize(median_IBU = median(IBU, na.rm = TRUE)) %>%
+  arrange(desc(median_IBU))
+
+median_ibu_by_state
+# Find the top 3 states with the highest average ibu
+top_3_states_ibu <- head(median_ibu_by_state, n = 3)
+
+# Print the top 3 states with the highest average ibu
+print(top_3_states_ibu)
+
+summary(bb2$ABV)
+
+
+# Create a scatterplot of ABV vs. IBU
+bb2 %>% ggplot(aes(x = ABV, y = IBU)) +
+  geom_point() + geom_smooth(method = "loess") + geom_smooth(method = "lm", color = "red") +
+  labs(x = "ABV", y = "IBU", title = "Scatterplot of ABV vs. IBU")
+
+
+bb2 %>% ggplot(aes(x = ABV, y = IBU)) + geom_point(position = "jitter")
+
+#begin of looking into question 9
+# printing our the distributions for the ABV compared to the ounces in beers
+par(mfrow=c(2,2))
+hist(bb2$Ounces, xlab='Ounces distribution', main='Beer in ounces')
+box()
+hist(bb2$ABV, xlab='ABV distribution', main='ABV')
+box()
+qqnorm(bb2$Ounces)
+qqnorm(bb2$ABV)
+
+
+unique_values <- length(unique(bb2$Ounces))
+unique_values
+#printing out the bar graphs for the distribution counts for beers by ounces
+bb2 %>% ggplot(aes(x = Ounces)) + geom_bar() + scale_x_discrete(guide = guide_axis(angle = 90))
+
+#filtered out the other ounces value and only kept 12 and 16 because all of the other 
+#ones didn't have a significant amount of values. Also performed a log transformation on the ounces data to get a more normally distributed results.
+
+bb2$ABV = log(bb2$ABV)
+
+bb2_revised <- bb2 %>% filter(Ounces == "12" | Ounces == "16")
+#Setting the Ounces as a factor so we can later plot the values in our ggplots
+bb2_revised$Ounces <- as.factor(bb2_revised$Ounces)
+
+#plot of the 12oz and 16oz beers count
+bb2_revised %>% ggplot(aes(x = Ounces)) + geom_bar() + scale_x_discrete(guide = guide_axis(angle = 90))
+#running a t-test for the ABV compared to 12 and 16 ounce beers 
+#This shows that there is significant difference between the 12oz & 16oz beers ABV levels
+t.test(ABV~Ounces, data = bb2_revised, var.equal = TRUE)
+#plot of the log transformed distribution of the ABV values
+bb2_revised %>% ggplot(aes(x = ABV)) + geom_bar() + scale_x_discrete(guide = guide_axis(angle = 90))
+#Plot of the log transformed median ABV value by ounces
+bb2_revised%>% ggplot(aes(x = Ounces, y =  ABV, colours = Ounces )) + stat_summary(fun = "median", geom = "bar")+ 
+  scale_x_discrete(guide = guide_axis(angle = 90)) + labs(title = "Median ABV by beer oz")
+#Boxplot of the ABV compared to ounces
+boxplot(ABV~Ounces, data = bb2_revised)
+#density plot of the ABV after the log transformations of 12oz and 16oz beers
+bb2_revised %>% 
+  ggplot(aes(x = ABV, after_stat(density), color = Ounces, fill = Ounces)) +
+  geom_freqpoly() + 
+  ggtitle("Density Plot of ABV distribution comparing 12 & 16oz beers")
+
+#conclusion
+#we see after the log transformation of the ABV data and running the t.test
+#that there is significant evidence to prove that these values are different. Since
+#we are not sure of the randomness of this data we are only able to extend the inference 
+#of our t.test to the data that from the data sets.When looking at the plot for the abv compared to #ibu it visually shows a positive relationship between the values. 
+#Through our research we found that the beer with the highest ABV is London Balling in KY, and the beer with the highest IBU is  Bitter Bitch Imperial from OR.
+#There does appear to be a positive relationship between the ABV and IBU values.
+#Based off beers IBUs and ABVs we can predict with a 89.05% accuracy whether a beer is a IPA from a list of ales.
+#Based off this data set we found that there is a statistically significant difference in the ABV levels between 12oz and 16oz beers.
+
+
+
+
+
+
+
