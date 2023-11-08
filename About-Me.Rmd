@@ -4,7 +4,7 @@ output: html_document
 date: "2023-11-07"
 ---
 
-# Ivan Chavez
+# Ivan Chavez Webpage
 # I am from Dallas, TX 
 # I currently work at HCSC as a product delivery analyst in the stop loss department.
 # I attended Texas Tech University for my BA in Economics and minored in Spanish
