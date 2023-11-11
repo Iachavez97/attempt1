@@ -1,0 +1,8 @@
+name: "Ivan_Chavez-website"
+navbar:
+  title: "My Website"
+  left:
+    - text: "Home"
+      href: About-me.html
+    - text: "Beer Data Projects"
+      href: FinalBeerProject[84].html
