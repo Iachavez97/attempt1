@@ -1,0 +1,12 @@
+name: BeerApp
+title: BeerApp
+username: iachavez97
+account: iachavez97
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 10488377
+bundleId: 7913052
+url: https://iachavez97.shinyapps.io/BeerApp/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
